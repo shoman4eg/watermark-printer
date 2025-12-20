@@ -6,6 +6,7 @@ use uuid::Uuid;
 use watermark_printer::handler::PrintJobHandler;
 use watermark_printer::server::IppServer;
 use watermark_printer::service::{PrinterInfoBuilder, SimpleIppService};
+use watermark_printer::drawer::WatermarkConfig;
 
 #[derive(Parser)]
 struct Args {
@@ -33,6 +34,22 @@ struct Args {
     team_id_script: Option<String>,
     #[arg(short = 'I', long, help = "Next printer IPP URL")]
     next_ipp: Uri,
+
+    // Новые параметры для водяного знака
+    #[arg(long, default_value = "256.0", help = "Watermark text size")]
+    wm_size: f32,
+    
+    #[arg(long, default_value = "128,128,128,192", help = "Watermark color in RGBA format (e.g., 255,0,0,150)")]
+    wm_color: String,
+    
+    #[arg(long, default_value = "-25.8", help = "Watermark rotation angle in degrees")]
+    wm_rotation: f32,
+    
+    #[arg(long, default_value = "0.0", help = "Watermark X position (left offset in points)")]
+    wm_x: f32,
+    
+    #[arg(long, default_value = "100.0", help = "Watermark Y position (bottom offset in points)")]
+    wm_y: f32,
 }
 
 fn parse_bind_address(bind: &str) -> anyhow::Result<SocketAddr> {
@@ -50,6 +67,20 @@ fn parse_bind_address(bind: &str) -> anyhow::Result<SocketAddr> {
     )
 }
 
+fn parse_color(color_str: &str) -> anyhow::Result<[u8; 4]> {
+    let parts: Result<Vec<u8>, _> = color_str
+        .split(',')
+        .map(|s| s.trim().parse::<u8>())
+        .collect();
+    
+    let parts = parts?;
+    if parts.len() != 4 {
+        anyhow::bail!("Color must have 4 components (RGBA)");
+    }
+    
+    Ok([parts[0], parts[1], parts[2], parts[3]])
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
@@ -61,7 +92,22 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|| addr.ip().to_string());
     let displayed_addr = format!("{}:{}", hostname, addr.port());
 
-    let ipp_handler = PrintJobHandler::new(args.storage, args.team_id_script, args.next_ipp)?;
+    let color = parse_color(&args.wm_color)?;
+    
+    let watermark_config = WatermarkConfig {
+        size: args.wm_size,
+        color,
+        rotation_degrees: args.wm_rotation,
+        position_x: args.wm_x,
+        position_y: args.wm_y,
+    };
+
+    let ipp_handler = PrintJobHandler::new(
+        args.storage,
+        args.team_id_script,
+        args.next_ipp,
+        watermark_config,
+    )?;
     let mut ipp_service = SimpleIppService::new(displayed_addr, ipp_handler);
 
     ipp_service.set_info(

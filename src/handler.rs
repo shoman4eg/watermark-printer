@@ -9,7 +9,7 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 
-use crate::drawer::WatermarkFactory;
+use crate::drawer::{WatermarkFactory, WatermarkConfig};
 use crate::error::IppError;
 use crate::image_xobject::has_flipped_coordinates;
 use crate::pjl::{PjlError, extract_content};
@@ -23,9 +23,10 @@ static DEFAULT_TEAM_ID_SCRIPT: &str = include_str!("default_team_id_script.lua")
 pub struct PrintJobHandler {
     storage: PathBuf,
     watermark_factory: WatermarkFactory,
+    watermark_config: WatermarkConfig,
     next_ipp_uri: Uri,
     next_ipp_client: AsyncIppClient,
-    _lua: Lua, // extends lua lifetime
+    _lua: Lua,
     get_team_id: Function,
 }
 
@@ -34,6 +35,7 @@ impl PrintJobHandler {
         storage_path: String,
         team_id_script: Option<String>,
         next_ipp: Uri,
+        watermark_config: WatermarkConfig,
     ) -> anyhow::Result<Self> {
         let lua = Lua::new();
 
@@ -47,7 +49,8 @@ impl PrintJobHandler {
 
         Ok(Self {
             storage: PathBuf::from(storage_path),
-            watermark_factory: WatermarkFactory::new(),
+            watermark_factory: WatermarkFactory::new(watermark_config.clone()),
+            watermark_config,
             next_ipp_uri: next_ipp.clone(),
             next_ipp_client: AsyncIppClient::new(next_ipp),
             _lua: lua,
@@ -108,7 +111,14 @@ impl SimpleIppServiceHandler for PrintJobHandler {
         let watermark =
             self.watermark_factory
                 .draw(team_id, 595, 595, has_flipped_coordinates(&document));
-        apply_watermark(&mut document, watermark, 0.0, 100.0)?;
+        
+        // Используем позицию из конфигурации
+        apply_watermark(
+            &mut document,
+            watermark,
+            self.watermark_config.position_x,
+            self.watermark_config.position_y,
+        )?;
 
         let pdf_path = addr_dir.join(format!("{}.pdf", filename));
         document.save(&pdf_path)?;
@@ -121,7 +131,6 @@ impl SimpleIppServiceHandler for PrintJobHandler {
 
         if let Err(err) = self.next_ipp_client.send(operation).await {
             eprintln!("Failed to send job to next printer: {}", err);
-            // TODO Error
         }
 
         std::fs::remove_file(raw_path)?;
