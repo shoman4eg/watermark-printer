@@ -3,6 +3,7 @@ use crate::result::IppResult;
 use crate::server::IppServerHandler;
 use anyhow;
 use async_compression::futures::bufread;
+use log::{info, error};
 use async_trait::async_trait;
 use ipp::attribute::IppAttribute;
 use ipp::model::{DelimiterTag, IppVersion, JobState, Operation, PrinterState, StatusCode};
@@ -324,7 +325,7 @@ impl<T: SimpleIppServiceHandler> IppServerHandler for SimpleIppService<T> {
             .into());
         }
 
-        eprintln!("Received job {}", req_id);
+        info!("Received job {}", req_id);
         let payload = match compression {
             None => req.into_payload(),
             Some("gzip") => {
@@ -347,7 +348,7 @@ impl<T: SimpleIppServiceHandler> IppServerHandler for SimpleIppService<T> {
             .await;
 
         if let Err(e) = result {
-            eprintln!("Job {} failed: {:?}", req_id, e);
+            error!("Job {} failed: {:?}", req_id, e);
             return Err(IppError {
                 code: StatusCode::ServerErrorInternalError,
                 msg: format!("Print failed: {:?}", e),

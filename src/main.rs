@@ -1,5 +1,6 @@
 use clap::Parser;
 use ipp::prelude::Uri;
+use log::info;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -83,6 +84,8 @@ fn parse_color(color_str: &str) -> anyhow::Result<[u8; 4]> {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    
     let args = Args::parse();
     let addr = parse_bind_address(&args.bind)?;
 
@@ -121,9 +124,9 @@ async fn main() -> anyhow::Result<()> {
             .unwrap(),
     );
 
-    println!("Listening on {}", addr);
+    info!("Listening on {}", addr);
     if let Err(e) = IppServer::serve(addr, Arc::new(ipp_service)).await {
-        eprintln!("Server error: {}", e);
+        log::error!("Server error: {}", e);
     }
     Ok(())
 }

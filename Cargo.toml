@@ -26,6 +26,8 @@ png = "0.18"
 scopeguard = "1.2.0"
 tempfile = "3.23.0"
 thiserror = "2.0.17"
+log = "0.4"
+env_logger = "0.11"
 tokio = {version = "1", features = ["rt-multi-thread", "macros"], default-features = false}
 tokio-util = {version = "0.7", features = ["io", "compat"], default-features = false}
 uuid = { version = "1", features = ["v3", "v4"] }

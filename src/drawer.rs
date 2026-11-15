@@ -1,7 +1,7 @@
 use ab_glyph::FontRef;
 use image::{ImageBuffer, Rgba};
 use imageproc::drawing::{draw_text_mut, text_size};
-use imageproc::geometric_transformations::{Interpolation, Projection, warp};
+use imageproc::geometric_transformations::{warp, Interpolation, Projection};
 
 #[derive(Clone)]
 pub struct WatermarkConfig {
@@ -73,7 +73,7 @@ impl WatermarkFactory {
 
         // Конвертируем градусы в радианы
         let rotation_radians = self.config.rotation_degrees.to_radians();
-        
+
         projection = projection
             * Projection::rotate(rotation_radians)
             * Projection::translate(-0.5 * width as f32, -0.5 * height as f32);

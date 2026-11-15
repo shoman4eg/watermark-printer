@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use futures::AsyncReadExt;
 use ipp::model::StatusCode;
 use ipp::prelude::{AsyncIppClient, IppOperationBuilder, IppPayload, Uri};
+use log::{warn, error};
 use lopdf::Document;
 use mlua::{Function, Lua};
 use std::net::SocketAddr;
@@ -72,7 +73,7 @@ impl SimpleIppServiceHandler for PrintJobHandler {
         {
             Some(team_id) => team_id,
             None => {
-                eprintln!(
+                warn!(
                     "Unknown origin machine {}, skipping the job",
                     remote_addr.ip()
                 );
@@ -97,7 +98,7 @@ impl SimpleIppServiceHandler for PrintJobHandler {
             Ok(pjl_content) => pjl_content,
             Err(PjlError::NotPjlFile) => content,
             Err(PjlError::UnsupportedPjlFile) => {
-                eprintln!("Not a PJL file");
+                warn!("Not a PJL file");
                 return Err(IppError {
                     code: StatusCode::ClientErrorDocumentFormatNotSupported,
                     msg: StatusCode::ClientErrorDocumentFormatNotSupported.to_string(),
@@ -127,10 +128,11 @@ impl SimpleIppServiceHandler for PrintJobHandler {
 
         let operation = IppOperationBuilder::print_job(self.next_ipp_uri.clone(), payload)
             .job_title(filename)
+            .document_format("application/pdf")
             .build();
 
         if let Err(err) = self.next_ipp_client.send(operation).await {
-            eprintln!("Failed to send job to next printer: {}", err);
+            error!("Failed to send job to next printer: {}", err);
         }
 
         std::fs::remove_file(raw_path)?;
